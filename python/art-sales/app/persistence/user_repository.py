@@ -14,7 +14,7 @@ class UserRepository:
 
     @staticmethod
     def find_by_email(email: str) -> dict | None:
-        """
+        """2
         Find a user document by email.
         Returns the Mongo document as dict if found, else None.
         """

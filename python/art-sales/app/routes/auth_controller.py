@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+
+from app.dtos.requests.user_login_request import UserLoginRequest
 from app.dtos.requests.user_signup_request import UserSignupRequest
 from app.services.auth_services import AuthService
 from app.persistence.user_repository import UserRepository
@@ -27,3 +29,15 @@ def signup():
             "success": False,
             "message": f"Invalid request payload: {str(te)}"
         }), 400
+
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    try:
+        login_request = UserLoginRequest(**data)  # constructs DTO
+        response = auth_service.login_user(login_request)
+        status_code = 200 if response.success else 401
+        return jsonify(response.__dict__), status_code
+    except TypeError as te:
+        # bad JSON shape -> 400 Bad Request
+        return jsonify({"success": False, "message": f"Invalid request payload: {str(te)}"}), 400

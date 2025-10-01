@@ -2,6 +2,7 @@ import pytest
 from app import create_app, mongo
 from app.config.db_config import TestConfig
 from bson.objectid import ObjectId
+import jwt
 
 
 @pytest.fixture
@@ -104,4 +105,51 @@ def test_signup_weak_password(client):
     json_data = response.get_json()
     assert json_data["success"] is False
     assert json_data["message"] == "Password must be at least 6 characters"
+
+
+def test_login_success(app, client):
+    """
+    TDD step 1 - make signup then login succeed and token contains correct payload.
+    """
+    # 1. Register a user (setup for login)
+    signup_data = {
+        "name": "Login User",
+        "email": "loginuser@example.com",
+        "password": "StrongPass123",
+        "role": "buyer"
+    }
+    # call the existing signup endpoint - this uses your signup code
+    r = client.post("/auth/signup", json=signup_data)
+    assert r.status_code == 201  # signup must succeed for login test
+
+    # 2. Call /auth/login with same credentials
+    login_data = {"email": signup_data["email"], "password": signup_data["password"]}
+    r2 = client.post("/auth/login", json=login_data)
+
+    # EXPECTED: 200 OK + access token
+    assert r2.status_code == 200
+    json_data = r2.get_json()
+    assert json_data["success"] is True
+    assert "access_token" in json_data and json_data["access_token"]
+
+    # 3. Inspect token payload to ensure it has user_id and role
+    token = json_data["access_token"]
+    decoded = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+    # user_id should be a valid ObjectId string
+    assert "user_id" in decoded and ObjectId.is_valid(decoded["user_id"])
+    assert decoded.get("role") == signup_data["role"]
+
+
+def test_login_invalid_credentials(client):
+    """
+    TDD step 2 - request with invalid credentials returns 401 with generic message.
+    """
+    login_data = {"email": "noone@example.com", "password": "wrong"}
+    r = client.post("/auth/login", json=login_data)
+
+    # EXPECTED: 401 Unauthorized (do not reveal whether email exists)
+    assert r.status_code == 401
+    json_data = r.get_json()
+    assert json_data["success"] is False
+    assert "Invalid email or password" in json_data["message"]
 
