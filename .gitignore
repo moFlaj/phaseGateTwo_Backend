@@ -16,6 +16,7 @@ __pycache__/
 # Node (frontend)
 # -----------------
 node_modules/
+<<<<<<< HEAD
 
 # -----------------
 # JetBrains IDE (PyCharm / IntelliJ IDEA)
@@ -37,6 +38,4 @@ java/target/
 # Maven Wrapper (optional)
 # -----------------
 .mvn/wrapper/maven-wrapper.jar
-
-
 
