@@ -1,18 +1,39 @@
-# Ignore virtual environments
-venv/
-
-# macOS system files
+# -----------------
+# General OS junk
+# -----------------
 .DS_Store
 python/.DS_Store
+java/.DS_Store
 
-# Python cache
+# -----------------
+# Python (PyCharm)
+# -----------------
+venv/
 __pycache__/
 *.pyc
 
-# PyCharm
-.idea/
-
-# Node or frontend tools (optional)
+# -----------------
+# Node (frontend)
+# -----------------
 node_modules/
 
+# -----------------
+# JetBrains IDE (PyCharm / IntelliJ IDEA)
+# -----------------
+.idea/
+*.iml
 
+# -----------------
+# Java (Maven single module project in java/)
+# -----------------
+java/target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# -----------------
+# Maven Wrapper (optional)
+# -----------------
+.mvn/wrapper/maven-wrapper.jar
