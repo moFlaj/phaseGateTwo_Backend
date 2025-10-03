@@ -1,0 +1,3 @@
+com/phaseGateTwo/cms/common/TestSecurityConfig.class
+com/phaseGateTwo/cms/common/BaseIntegrationTest.class
+com/phaseGateTwo/cms/userAuth/controllers/AuthIntegrationTest.class

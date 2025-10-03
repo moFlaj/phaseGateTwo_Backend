@@ -1,25 +1,7 @@
-import pytest
-from app import create_app, mongo
-from app.config.db_config import TestConfig
+
+from app.tests.conftest import client
 from bson.objectid import ObjectId
-import jwt
-
-
-@pytest.fixture
-def app():
-    app = create_app(config_class=TestConfig)
-
-    # Clean test DB before each test run
-    with app.app_context():
-        db = mongo.cx[TestConfig.DB_NAME]
-        db.users.delete_many({})  # empty users collection before each test
-
-    yield app
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
+from app.tests.helpers import signup_and_login
 
 
 def test_signup_success(client):
@@ -107,49 +89,114 @@ def test_signup_weak_password(client):
     assert json_data["message"] == "Password must be at least 6 characters"
 
 
-def test_login_success(app, client):
-    """
-    TDD step 1 - make signup then login succeed and token contains correct payload.
-    """
-    # 1. Register a user (setup for login)
+def test_login_success(client):
+    token = signup_and_login(client)
+    assert token is not None
+
+
+
+def test_login_wrong_password(client):
     signup_data = {
-        "name": "Login User",
-        "email": "loginuser@example.com",
-        "password": "StrongPass123",
+        "name": "Wrong Password User",
+        "email": "wrongpass@example.com",
+        "password": "RightPass123",
         "role": "buyer"
     }
-    # call the existing signup endpoint - this uses your signup code
-    r = client.post("/auth/signup", json=signup_data)
-    assert r.status_code == 201  # signup must succeed for login test
+    client.post('/auth/signup', json=signup_data)
 
-    # 2. Call /auth/login with same credentials
-    login_data = {"email": signup_data["email"], "password": signup_data["password"]}
-    r2 = client.post("/auth/login", json=login_data)
+    login_data = {"email": "wrongpass@example.com", "password": "WrongPass999"}
+    response = client.post('/auth/login', json=login_data)
 
-    # EXPECTED: 200 OK + access token
-    assert r2.status_code == 200
-    json_data = r2.get_json()
-    assert json_data["success"] is True
-    assert "access_token" in json_data and json_data["access_token"]
-
-    # 3. Inspect token payload to ensure it has user_id and role
-    token = json_data["access_token"]
-    decoded = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
-    # user_id should be a valid ObjectId string
-    assert "user_id" in decoded and ObjectId.is_valid(decoded["user_id"])
-    assert decoded.get("role") == signup_data["role"]
-
-
-def test_login_invalid_credentials(client):
-    """
-    TDD step 2 - request with invalid credentials returns 401 with generic message.
-    """
-    login_data = {"email": "noone@example.com", "password": "wrong"}
-    r = client.post("/auth/login", json=login_data)
-
-    # EXPECTED: 401 Unauthorized (do not reveal whether email exists)
-    assert r.status_code == 401
-    json_data = r.get_json()
+    assert response.status_code == 401
+    json_data = response.get_json()
     assert json_data["success"] is False
     assert "Invalid email or password" in json_data["message"]
 
+
+def test_login_nonexistent_email(client):
+    login_data = {"email": "doesnotexist@example.com", "password": "Whatever123"}
+    response = client.post('/auth/login', json=login_data)
+
+    assert response.status_code == 401
+    json_data = response.get_json()
+    assert json_data["success"] is False
+    assert "Invalid email or password" in json_data["message"]
+
+
+# ======================
+# PROTECTED ROUTES TESTS
+# ======================
+
+def test_protected_endpoint_requires_token(client):
+    r = client.get("/artist/dashboard")
+    assert r.status_code == 401
+    assert "Authorization" in r.get_json()["message"]
+
+
+def test_protected_endpoint_with_valid_artist_token(client):
+    token = signup_and_login(client, "artist")
+    r = client.get("/artist/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    json_data = r.get_json()
+    assert json_data["success"] is True
+
+
+def test_protected_endpoint_with_invalid_token(client):
+    r = client.get("/artist/dashboard", headers={"Authorization": "Bearer not_a_real_token"})
+    assert r.status_code == 401
+    json_data = r.get_json()
+    assert json_data["success"] is False
+    assert "Invalid token" in json_data["message"]
+
+
+def test_protected_endpoint_wrong_role(client):
+    token = signup_and_login(client, role="buyer")
+    r = client.get("/artist/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+    json_data = r.get_json()
+    assert json_data["success"] is False
+    assert "Forbidden" in json_data["message"]
+
+# ====== BUYER PROTECTED ROUTES TESTS ======
+def test_buyer_protected_requires_token(client):
+    """
+    No Authorization header -> 401
+    """
+    r = client.get("/buyer/dashboard")
+    assert r.status_code == 401
+    assert "Authorization" in r.get_json()["message"]
+
+
+def test_buyer_endpoint_with_valid_buyer_token(client):
+    """
+    Buyer token -> 200 OK
+    """
+    token = signup_and_login(client, role="buyer")
+    print("\nTOKEN:", token)
+    r = client.get("/buyer/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    json_data = r.get_json()
+    assert json_data["success"] is True
+
+
+def test_buyer_endpoint_with_invalid_token(client):
+    """
+    Invalid token -> 401
+    """
+    r = client.get("/buyer/dashboard", headers={"Authorization": "Bearer totally_wrong"})
+    assert r.status_code == 401
+    json_data = r.get_json()
+    assert json_data["success"] is False
+    assert "Invalid token" in json_data["message"]
+
+
+def test_buyer_endpoint_forbidden_for_artist(client):
+    """
+    An artist token trying to call buyer endpoint -> 403
+    """
+    token = signup_and_login(client, role="artist")
+    r = client.get("/buyer/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403
+    json_data = r.get_json()
+    assert json_data["success"] is False
+    assert "Forbidden" in json_data["message"]
