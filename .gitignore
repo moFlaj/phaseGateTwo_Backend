@@ -27,7 +27,7 @@ node_modules/
 # -----------------
 # Java (Maven single module project in java/)
 # -----------------
-java/target/
+**/target/
 *.class
 *.jar
 *.war
