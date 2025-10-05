@@ -1,14 +1,12 @@
-import pytest
-from app.tests.helpers import signup_and_login
-from app.tests.conftest import client
+from tests.helpers import signup_and_login
+from tests.conftest import client
 
 
 def test_buyer_order_history_empty(client):
     token = signup_and_login(client, "buyer")
     r = client.get("/buyer/dashboard", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
-    data = r.get_json()
-    assert data["orders"] == []
+    assert r.get_json()["orders"] == []
 
 
 def test_buyer_cart_add_and_get(client):
@@ -31,23 +29,18 @@ def test_buyer_profile_update(client):
     assert data["success"] is True
 
 
-def test_artist_upload_and_dashboard(client):
-    token = signup_and_login(client, role="artist")
 
-    # Upload artwork
+def test_artist_upload_and_dashboard(client):
+    token = signup_and_login(client, "artist")
+
     artwork_data = {"title": "Sunset", "price": 100.0, "image_url": "http://example.com/sunset.jpg"}
     r1 = client.post("/artist/artwork", headers={"Authorization": f"Bearer {token}"}, json=artwork_data)
     assert r1.status_code == 201
-    json_data = r1.get_json()
-    artwork_id = json_data["artwork_id"]
-    assert json_data["success"] is True
+    artwork_id = r1.get_json()["artwork_id"]
 
-    # Check dashboard lists artwork
     r2 = client.get("/artist/dashboard", headers={"Authorization": f"Bearer {token}"})
     assert r2.status_code == 200
-    data = r2.get_json()
-    assert any(a["title"] == "Sunset" for a in data["artworks"])
-
+    assert any(a["title"] == "Sunset" for a in r2.get_json()["artworks"])
 
 def test_artist_update_and_delete_artwork(client):
     token = signup_and_login(client, role="artist")

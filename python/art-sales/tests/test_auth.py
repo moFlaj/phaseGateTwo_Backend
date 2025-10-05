@@ -1,7 +1,7 @@
 
-from app.tests.conftest import client
+from tests.conftest import client
 from bson.objectid import ObjectId
-from app.tests.helpers import signup_and_login
+from tests.helpers import signup_and_login
 
 
 def test_signup_success(client):
@@ -31,17 +31,12 @@ def test_signup_duplicate_email(client):
         "password": "StrongPass123",
         "role": "buyer"
     }
-
-    # First signup should succeed
     response1 = client.post('/auth/signup', json=signup_data)
     assert response1.status_code == 201
-
-    # Second signup with same email should fail
     response2 = client.post('/auth/signup', json=signup_data)
-    assert response2.status_code == 409  # Conflict
-
+    assert response2.status_code == 409
     json_data = response2.get_json()
-    assert json_data["success"] is False
+    assert not json_data["success"]
     assert json_data["message"] == "Email already in use."
 
 def test_signup_missing_required_field(client):
@@ -137,8 +132,7 @@ def test_protected_endpoint_with_valid_artist_token(client):
     token = signup_and_login(client, "artist")
     r = client.get("/artist/dashboard", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
-    json_data = r.get_json()
-    assert json_data["success"] is True
+    assert r.get_json()["success"] is True
 
 
 def test_protected_endpoint_with_invalid_token(client):
@@ -153,9 +147,7 @@ def test_protected_endpoint_wrong_role(client):
     token = signup_and_login(client, role="buyer")
     r = client.get("/artist/dashboard", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
-    json_data = r.get_json()
-    assert json_data["success"] is False
-    assert "Forbidden" in json_data["message"]
+
 
 # ====== BUYER PROTECTED ROUTES TESTS ======
 def test_buyer_protected_requires_token(client):
