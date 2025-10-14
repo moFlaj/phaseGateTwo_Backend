@@ -2,21 +2,38 @@
 # General OS junk
 # -----------------
 .DS_Store
-python/.DS_Store
-java/.DS_Store
+**/.DS_Store
 
 # -----------------
-# Python (PyCharm)
+# Python (Global + art_sales project inside python/)
 # -----------------
-venv/
+# Byte-compiled / cache
 __pycache__/
+**/__pycache__/
 *.pyc
+
+# Virtual environments
+venv/
+test_venv/
+python/venv/
+python/test_venv/
+
+# Pytest & logs
+**/.pytest_cache/
+*.log
+
+# Environment/config files
+.env
+python/.env
+
+# Local DBs
+*.sqlite3
+*.db
 
 # -----------------
 # Node (frontend)
 # -----------------
 node_modules/
-<<<<<<< HEAD
 
 # -----------------
 # JetBrains IDE (PyCharm / IntelliJ IDEA)
