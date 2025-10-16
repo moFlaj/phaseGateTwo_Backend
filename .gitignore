@@ -1,45 +1,37 @@
 # -----------------
 # General OS junk
 # -----------------
-.DS_Store
 **/.DS_Store
+Thumbs.db
 
 # -----------------
-# Python (Global + art_sales project inside python/)
+# Python (PyCharm)
 # -----------------
-# Byte-compiled / cache
-__pycache__/
-**/__pycache__/
-*.pyc
-
-# Virtual environments
 venv/
 test_venv/
-python/venv/
-python/test_venv/
-
-# Pytest & logs
-**/.pytest_cache/
-*.log
-
-# Environment/config files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 .env
-python/.env
-
-# Local DBs
+.env.*
+*.env
 *.sqlite3
-*.db
 
 # -----------------
 # Node (frontend)
 # -----------------
 node_modules/
+dist/
+build/
 
 # -----------------
 # JetBrains IDE (PyCharm / IntelliJ IDEA)
 # -----------------
 .idea/
 *.iml
+out/
 
 # -----------------
 # Java (Maven single module project in java/)
@@ -56,3 +48,14 @@ node_modules/
 # -----------------
 .mvn/wrapper/maven-wrapper.jar
 
+# -----------------
+# VS Code / Editor Configs
+# -----------------
+.vscode/
+.history/
+*.code-workspace
+
+# -----------------
+# macOS Finder metadata
+# -----------------
+**/.DS_Store
