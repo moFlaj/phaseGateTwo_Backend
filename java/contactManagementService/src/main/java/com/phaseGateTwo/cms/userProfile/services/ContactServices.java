@@ -2,91 +2,74 @@ package com.phaseGateTwo.cms.userProfile.services;
 
 import com.phaseGateTwo.cms.userProfile.dtos.requests.AddContactRequest;
 import com.phaseGateTwo.cms.userProfile.dtos.requests.EditContactRequest;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.AddContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.EditContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.ViewContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.ViewUserContactsResponse;
+import com.phaseGateTwo.cms.userProfile.dtos.responses.*;
+import com.phaseGateTwo.cms.userProfile.exceptions.ContactNotFoundException;
+import com.phaseGateTwo.cms.userProfile.exceptions.DuplicateContactException;
+import com.phaseGateTwo.cms.userProfile.exceptions.UnauthorizedContactAccessException;
+import com.phaseGateTwo.cms.userProfile.mappers.UserProfileMapper;
 import com.phaseGateTwo.cms.userProfile.models.Contact;
 import com.phaseGateTwo.cms.userProfile.repositories.ContactsRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class ContactServices {
 
     private final ContactsRepository contactRepository;
+    private final UserProfileMapper mapper;
 
-    public ContactServices(ContactsRepository contactRepository) {
+    public ContactServices(ContactsRepository contactRepository, UserProfileMapper mapper) {
         this.contactRepository = contactRepository;
+        this.mapper = mapper;
     }
 
     public ViewUserContactsResponse getAllContactsByUserId(String userId) {
         List<Contact> userContacts = contactRepository.findByUserId(userId);
-
-        List<Map<String, String>> contactsList = new ArrayList<>();
-
-        for (Contact c : userContacts) {
-            Map<String, String> contactMap = new HashMap<>();
-            contactMap.put("contactId", c.getContactId());
-            contactMap.put("fullName", c.getFullName());
-            contactsList.add(contactMap);
-        }
-
+        List<Map<String, String>> contactsList = mapper.toContactSummaryList(userContacts);
         return new ViewUserContactsResponse(contactsList);
     }
 
     public EditContactResponse editContact(String userId, String contactId, EditContactRequest request) {
-        // Fetch contact and ensure it belongs to this user
         Contact contact = contactRepository.findById(contactId)
-                .orElseThrow(() -> new RuntimeException("Contact not found"));
+                .orElseThrow(() -> new ContactNotFoundException("Contact not found"));
 
         if (!contact.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new UnauthorizedContactAccessException("Unauthorized");
         }
 
-        // Update fields
-        contact.setFullName(request.getFullName());
-        contact.setPhone(request.getPhone());
-        contact.setEmail(request.getEmail());
-
-        // Save changes
-        contactRepository.save(contact);
-
-        return new EditContactResponse(
-                contact.getContactId(),
-                contact.getFullName(),
-                contact.getPhone(),
-                contact.getEmail()
-        );
+        Contact editedContact = mapper.applyEditContactRequestToContact(request, contact);
+        Contact saved = contactRepository.save(editedContact);
+        return mapper.toEditContactResponse(saved);
     }
 
     public AddContactResponse addContact(String userId, AddContactRequest request) {
-        Contact contact = new Contact();
-        contact.setUserId(userId);
-        contact.setFullName(request.getFullName());
-        contact.setPhone(request.getPhone());
-        contact.setEmail(request.getEmail());
+        Optional<Contact> existing = contactRepository.findByPhoneAndUserId(request.getPhone(), userId);
 
-        contactRepository.save(contact);
+        if (existing.isPresent()) {
+            throw new DuplicateContactException("Contact with this phone number already exists. Send update request to modify.");
+        }
 
-        return new AddContactResponse(
-                contact.getContactId(),
-                contact.getFullName(),
-                contact.getPhone(),
-                contact.getEmail()
-        );
+        Contact contact = mapper.fromAddContactRequest(request, userId);
+        Contact saved = contactRepository.save(contact);
+        return mapper.toAddContactResponse(saved);
     }
 
-    // Fetch single contact by ID
+
     public ViewContactResponse getContactById(String contactId, String userId) {
         Optional<Contact> contactOpt = contactRepository.findByContactIdAndUserId(contactId, userId);
-        if (!contactOpt.isPresent()) {
-            throw new RuntimeException("Contact not found");
-        }
-        Contact contact = contactOpt.get();
-        return new ViewContactResponse(contact.getFullName(), contact.getPhone(), contact.getEmail());
+        Contact contact = contactOpt.orElseThrow(() -> new ContactNotFoundException("Contact not found"));
+        return mapper.toViewContactResponse(contact);
+    }
+
+    public DeleteContactResponse deleteContact(String userId, String contactId) {
+        Contact contact = contactRepository.findByContactIdAndUserId(contactId, userId)
+                .orElseThrow(() -> new ContactNotFoundException("Contact not found"));
+
+        contactRepository.delete(contact);
+        return new DeleteContactResponse("Contact deleted successfully");
     }
 
 }

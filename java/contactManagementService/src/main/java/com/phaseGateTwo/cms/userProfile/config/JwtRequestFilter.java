@@ -38,7 +38,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
 
         // 🔑 Skip JWT check for public endpoints
-        if (path.startsWith("/cms/api/auth/")) {
+        if (path.startsWith("/api/auth/")) {
             filterChain.doFilter(request, response);
             return;
         }

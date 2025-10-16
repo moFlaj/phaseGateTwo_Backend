@@ -8,6 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "contacts")
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Contact {
     @Id
     private String contactId;

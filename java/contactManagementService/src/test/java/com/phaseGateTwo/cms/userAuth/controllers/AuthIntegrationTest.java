@@ -16,121 +16,55 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void signup_shouldReturnOk() throws Exception {
-
-        SignUpRequest req = new SignUpRequest();
-        req.setEmail("testuser@example.com");
-        req.setPhoneNumber("09233217123");
-        req.setFullName("John Doe");
-
-
-        mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verificationCode").exists()); // assuming your response includes OTP
+        performSignup("09233217123", "testuser@example.com", "John Doe");
     }
 
     @Test
     void shouldReturnOtp_whenNewUserSignsUp() throws Exception {
-        SignUpRequest req = new SignUpRequest( "348012345678", "John Doe", "john@example.com");
-
-        String resp = mockMvc.perform(
-                        post("/api/auth/signup")
-                                .contentType("application/json")
-                                .content(asJson(req)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        VerifyUserResponse result = objectMapper.readValue(resp, VerifyUserResponse.class);
-
-        assertThat(result.getPhoneNumber()).isEqualTo("348012345678");
+        VerifyUserResponse result = performSignup("348012345678", "john@example.com", "John Doe");
         assertThat(result.getVerificationCode()).isNotBlank();
     }
 
     @Test
     void shouldConfirmSignupWithOtp() throws Exception {
-        SignUpRequest req = new SignUpRequest( "348012345678", "John Doe", "john@example.com");
-
-        String resp = mockMvc.perform(post("/api/auth/signup")
-                        .contentType("application/json")
-                        .content(asJson(req)))
-                .andReturn().getResponse().getContentAsString();
-        VerifyUserResponse otpResp = objectMapper.readValue(resp, VerifyUserResponse.class);
-
-        // confirm
-        OtpValidationRequest confirm = new OtpValidationRequest(
-                otpResp.getPhoneNumber(),
-                otpResp.getVerificationCode()
-        );
-
-        mockMvc.perform(post("/api/auth/signup/confirm")
-                        .contentType("application/json")
-                        .content(asJson(confirm)))
-                .andExpect(status().isOk());
+        VerifyUserResponse otpResp = performSignup("348012345678", "john@example.com", "John Doe");
+        confirmSignupAndGetJwt(otpResp);
     }
 
     @Test
     void shouldFailSignup_whenUserAlreadyExists() throws Exception {
-        SignUpRequest req = new SignUpRequest( "348012345678", "John Doe", "john@example.com");
-        String resp = mockMvc.perform(post("/api/auth/signup")
-                        .contentType("application/json")
-                        .content(asJson(req)))
-                .andReturn().getResponse().getContentAsString();
-        VerifyUserResponse signupResp = objectMapper.readValue(resp, VerifyUserResponse.class);
+        VerifyUserResponse firstSignup = performSignup("348012345678", "john@example.com", "John Doe");
+        confirmSignupAndGetJwt(firstSignup);
 
-        OtpValidationRequest validate = new OtpValidationRequest(signupResp.getPhoneNumber(), signupResp.getVerificationCode());
-
-        mockMvc.perform(post("/api/auth/signup/confirm")
-                        .contentType("application/json")
-                        .content(asJson(validate)))
-                .andExpect(status().isOk());
-
-
+        // duplicate signup
         mockMvc.perform(post("/api/auth/signup")
                         .contentType("application/json")
-                        .content(asJson(req)))
+                        .content(asJson(new SignUpRequest("348012345678", "John Doe", "john@example.com"))))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void shouldReturnOtp_whenExistingUserVerifies() throws Exception {
-        SignUpRequest req = new SignUpRequest( "348012345678", "John Doe", "john@example.com");
-        String resp = mockMvc.perform(post("/api/auth/signup")
+        VerifyUserResponse signupResp = performSignup("348012345678", "john@example.com", "John Doe");
+        confirmSignupAndGetJwt(signupResp);
+
+        VerifyUserRequest verifyReq = new VerifyUserRequest();
+        verifyReq.setPhoneNumber(signupResp.getPhoneNumber());
+
+        String resp = mockMvc.perform(post("/api/auth/verify")
                         .contentType("application/json")
-                        .content(asJson(req)))
+                        .content(asJson(verifyReq)))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        VerifyUserResponse signupResp = objectMapper.readValue(resp, VerifyUserResponse.class);
 
-        OtpValidationRequest validate = new OtpValidationRequest(signupResp.getPhoneNumber(), signupResp.getVerificationCode());
-
-        mockMvc.perform(post("/api/auth/signup/confirm")
-                        .contentType("application/json")
-                        .content(asJson(validate)))
-                .andExpect(status().isOk());
-
-        VerifyUserRequest request = new VerifyUserRequest();
-        request.setPhoneNumber(req.getPhoneNumber());
-
-        resp = mockMvc.perform(post("/api/auth/verify")
-                        .contentType("application/json")
-                        .content(asJson(request)))
-                .andReturn().getResponse().getContentAsString();
         VerifyUserResponse result = objectMapper.readValue(resp, VerifyUserResponse.class);
-
         assertThat(result.getPhoneNumber()).isEqualTo(signupResp.getPhoneNumber());
         assertThat(result.getVerificationCode()).isNotBlank();
     }
 
     @Test
     void shouldFailConfirmation_withInvalidOtp() throws Exception {
-        SignUpRequest req = new SignUpRequest("348012345679", "Jane Doe", "jane@example.com");
-
-        String resp = mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(req)))
-                .andReturn().getResponse().getContentAsString();
-
-        VerifyUserResponse signupResp = objectMapper.readValue(resp, VerifyUserResponse.class);
+        VerifyUserResponse signupResp = performSignup("348012345679", "jane@example.com", "Jane Doe");
 
         OtpValidationRequest invalid = new OtpValidationRequest(signupResp.getPhoneNumber(), "9999999999");
 
@@ -142,28 +76,9 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldReturnJwt_afterValidConfirmation() throws Exception {
-        SignUpRequest req = new SignUpRequest("348012345680", "Mike Doe", "mike@example.com");
-
-        String resp = mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(req)))
-                .andReturn().getResponse().getContentAsString();
-
-        VerifyUserResponse otpResp = objectMapper.readValue(resp, VerifyUserResponse.class);
-
-        OtpValidationRequest confirm = new OtpValidationRequest(
-                otpResp.getPhoneNumber(),
-                otpResp.getVerificationCode()
-        );
-
-        String jwt = mockMvc.perform(post("/api/auth/signup/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(confirm)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        assertThat(jwt).isNotBlank();
-        assertThat(jwt).startsWith("ey");
+        VerifyUserResponse otpResp = performSignup("348012345680", "mike@example.com", "Mike Doe");
+        String jwt = confirmSignupAndGetJwt(otpResp);
+        assertThat(jwt).isNotBlank().startsWith("ey");
     }
 
     @Test
@@ -174,29 +89,10 @@ public class AuthIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldAllowAccessToSecuredEndpoint_withValidJwt() throws Exception {
-        // Step 1: signup + confirm to get a JWT
-        SignUpRequest req = new SignUpRequest("348012345681", "Lisa Doe", "lisa@example.com");
+        String jwt = signupAndGetJwt("348012345681", "lisa@example.com", "Lisa Doe");
 
-        String resp = mockMvc.perform(post("/api/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(req)))
-                .andReturn().getResponse().getContentAsString();
-        VerifyUserResponse otpResp = objectMapper.readValue(resp, VerifyUserResponse.class);
-
-        OtpValidationRequest confirm = new OtpValidationRequest(
-                otpResp.getPhoneNumber(),
-                otpResp.getVerificationCode()
-        );
-
-        String jwt = mockMvc.perform(post("/api/auth/signup/confirm")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJson(confirm)))
-                .andReturn().getResponse().getContentAsString();
-
-        // Step 2: call secured endpoint with Authorization header
         mockMvc.perform(get("/api/profile/view")
                         .header("Authorization", "Bearer " + jwt))
                 .andExpect(status().isOk());
     }
-
 }

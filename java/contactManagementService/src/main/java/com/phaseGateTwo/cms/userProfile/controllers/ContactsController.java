@@ -2,11 +2,7 @@ package com.phaseGateTwo.cms.userProfile.controllers;
 
 import com.phaseGateTwo.cms.userProfile.dtos.requests.AddContactRequest;
 import com.phaseGateTwo.cms.userProfile.dtos.requests.EditContactRequest;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.AddContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.EditContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.ViewContactResponse;
-import com.phaseGateTwo.cms.userProfile.dtos.responses.ViewUserContactsResponse;
-
+import com.phaseGateTwo.cms.userProfile.dtos.responses.*;
 import com.phaseGateTwo.cms.userProfile.services.ContactServices;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +21,7 @@ public class ContactsController {
 
     @GetMapping("/all")
     public ViewUserContactsResponse getAllContacts(Authentication authentication) {
-        System.out.println("helllllllllllooooo");
+        System.out.println("contacts controller endpoint was hit");
         String userId = authentication.getPrincipal().toString();
         return contactService.getAllContactsByUserId(userId);
     }
@@ -46,7 +42,7 @@ public class ContactsController {
             @Valid @RequestBody AddContactRequest request,
             Authentication authentication) {
 
-        String userId = (String) authentication.getPrincipal();
+        String userId = authentication.getPrincipal().toString();
         AddContactResponse response = contactService.addContact(userId, request);
         return ResponseEntity.ok(response);
     }
@@ -62,5 +58,18 @@ public class ContactsController {
         ViewContactResponse contact = contactService.getContactById(contactId, userId);
         return ResponseEntity.ok(contact);
     }
+
+    @DeleteMapping("/{contactId}")
+    public ResponseEntity<DeleteContactResponse> deleteContact(
+            @PathVariable String contactId,
+            Authentication authentication) {
+
+        String userId = authentication.getPrincipal().toString();
+        DeleteContactResponse response = contactService.deleteContact(userId, contactId);
+
+        return ResponseEntity.ok(response);
+    }
+
+
 
 }
